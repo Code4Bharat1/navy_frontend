@@ -6,12 +6,15 @@ import { getUser, logout } from '../lib/api';
 
 const NAV_BY_ROLE = {
   super_admin: [
+    { href: '/admin/overview', label: 'Overview', icon: '🧭' },
     { href: '/admin/staff', label: 'Staff & Cards', icon: '🪪' },
     { href: '/admin/shops', label: 'Shops', icon: '🏬' },
+    { href: '/admin/transactions', label: 'Transactions', icon: '🧾' },
   ],
   shop_operator: [
     { href: '/shop/pos', label: 'Scan & Pay', icon: '📡' },
     { href: '/shop/dashboard', label: 'Dashboard', icon: '📊' },
+    { href: '/shop/settlements', label: 'Settlements', icon: '🏦' },
   ],
   staff: [{ href: '/dashboard', label: 'My Wallet', icon: '💳' }],
   recharge_operator: [{ href: '/dashboard', label: 'My Wallet', icon: '💳' }],

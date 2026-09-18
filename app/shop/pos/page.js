@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, getUser } from '../../../lib/api';
 import AppShell from '../../../components/AppShell';
+import { enqueuePurchase, syncQueue, getQueue, getQueueErrors, dismissQueueError, makeIdempotencyKey } from '../../../lib/offlineQueue';
 
-// amount -> scanning -> success | error -> back to scanning (same amount) or amount
-const STAGE = { AMOUNT: 'amount', SCANNING: 'scanning', SUCCESS: 'success', ERROR: 'error' };
+// amount -> scanning -> success | queued | error -> back to scanning (same amount) or amount
+const STAGE = { AMOUNT: 'amount', SCANNING: 'scanning', SUCCESS: 'success', QUEUED: 'queued', ERROR: 'error' };
 
 export default function ShopPosPage() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export default function ShopPosPage() {
   const [result, setResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [recent, setRecent] = useState([]);
+  const [queueCount, setQueueCount] = useState(0);
+  const [queueErrors, setQueueErrors] = useState([]);
   const scanInputRef = useRef(null);
 
   useEffect(() => {
@@ -48,6 +51,32 @@ export default function ShopPosPage() {
     loadRecent();
   }, [loadRecent]);
 
+  // Retry anything queued while offline: on mount, whenever the browser comes back
+  // online, and as a periodic fallback in case the 'online' event doesn't fire reliably.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function trySync() {
+      const outcome = await syncQueue(apiFetch);
+      if (cancelled) return;
+      setQueueCount(getQueue().length);
+      setQueueErrors(getQueueErrors());
+      if (outcome.synced > 0) loadRecent();
+    }
+
+    trySync();
+    setQueueCount(getQueue().length);
+    setQueueErrors(getQueueErrors());
+
+    window.addEventListener('online', trySync);
+    const interval = setInterval(trySync, 30000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', trySync);
+      clearInterval(interval);
+    };
+  }, [loadRecent]);
+
   function startScanning(e) {
     e.preventDefault();
     const numericAmount = Number(amount);
@@ -55,20 +84,29 @@ export default function ShopPosPage() {
     setStage(STAGE.SCANNING);
   }
 
+  function resetSoon() {
+    setTimeout(() => {
+      setAmount('');
+      setStage(STAGE.AMOUNT);
+    }, 2200);
+  }
+
   async function submitScan(cardUid) {
+    const payload = { cardUid, amount: Number(amount), idempotencyKey: makeIdempotencyKey() };
     try {
-      const data = await apiFetch('/purchase', {
-        method: 'POST',
-        body: { cardUid, amount: Number(amount) },
-      });
+      const data = await apiFetch('/purchase', { method: 'POST', body: payload });
       setResult(data);
       setStage(STAGE.SUCCESS);
       loadRecent();
-      setTimeout(() => {
-        setAmount('');
-        setStage(STAGE.AMOUNT);
-      }, 2200);
+      resetSoon();
     } catch (err) {
+      if (err.isNetworkError) {
+        enqueuePurchase({ ...payload, queuedAt: new Date().toISOString() });
+        setQueueCount(getQueue().length);
+        setStage(STAGE.QUEUED);
+        resetSoon();
+        return;
+      }
       setErrorMessage(err.message);
       setStage(STAGE.ERROR);
       setTimeout(() => setStage(STAGE.SCANNING), 2200);
@@ -89,8 +127,33 @@ export default function ShopPosPage() {
     setScanValue('');
   }
 
+  function handleDismissError(key) {
+    dismissQueueError(key);
+    setQueueErrors(getQueueErrors());
+  }
+
   return (
     <AppShell title="Scan & Pay" subtitle="Enter an amount, then have the customer tap their card on the reader" narrow>
+      {queueCount > 0 && (
+        <div className="banner" style={{ background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid #fcd9a8' }}>
+          📥 {queueCount} sale{queueCount === 1 ? '' : 's'} queued offline — will sync automatically once back online.
+        </div>
+      )}
+
+      {queueErrors.length > 0 && (
+        <div className="banner banner-error" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+          <div>⚠️ {queueErrors.length} queued sale{queueErrors.length === 1 ? '' : 's'} could not be completed:</div>
+          {queueErrors.map((e) => (
+            <div key={e.idempotencyKey} className="flex-row" style={{ justifyContent: 'space-between', fontWeight: 400, fontSize: 13 }}>
+              <span>Card {e.cardUid} · ₹{Number(e.amount).toFixed(2)} — {e.error}</span>
+              <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => handleDismissError(e.idempotencyKey)}>
+                Dismiss
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {stage === STAGE.AMOUNT && (
         <div className="card">
           <div className="card-title">New sale</div>
@@ -112,12 +175,17 @@ export default function ShopPosPage() {
         </div>
       )}
 
-      {(stage === STAGE.SCANNING || stage === STAGE.SUCCESS || stage === STAGE.ERROR) && (
-        <div className={`scan-stage ${stage === STAGE.SUCCESS ? 'state-success' : ''} ${stage === STAGE.ERROR ? 'state-error' : ''}`}>
+      {(stage === STAGE.SCANNING || stage === STAGE.SUCCESS || stage === STAGE.QUEUED || stage === STAGE.ERROR) && (
+        <div
+          className={`scan-stage ${stage === STAGE.SUCCESS || stage === STAGE.QUEUED ? 'state-success' : ''} ${
+            stage === STAGE.ERROR ? 'state-error' : ''
+          }`}
+        >
           <div className="scan-ring">
             <span className="scan-icon">
               {stage === STAGE.SCANNING && '📡'}
               {stage === STAGE.SUCCESS && '✅'}
+              {stage === STAGE.QUEUED && '📥'}
               {stage === STAGE.ERROR && '⚠️'}
             </span>
           </div>
@@ -135,6 +203,14 @@ export default function ShopPosPage() {
               <div className="scan-title">Payment received</div>
               <div className="scan-amount">₹{Number(amount).toFixed(2)}</div>
               <div className="scan-hint">from {result.staffName}</div>
+            </>
+          )}
+
+          {stage === STAGE.QUEUED && (
+            <>
+              <div className="scan-title">Saved — offline</div>
+              <div className="scan-amount">₹{Number(amount).toFixed(2)}</div>
+              <div className="scan-hint">No connection right now. This sale will sync automatically once you&apos;re back online.</div>
             </>
           )}
 

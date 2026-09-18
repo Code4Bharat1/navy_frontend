@@ -11,6 +11,8 @@ export default function ShopDashboardPage() {
   const [summary, setSummary] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busyId, setBusyId] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -40,9 +42,29 @@ export default function ShopDashboardPage() {
     loadData();
   }, [router, loadData]);
 
+  async function handleDispute(id) {
+    const reason = window.prompt('What happened with this sale? (e.g. wrong amount charged, card tapped twice)');
+    if (!reason) return;
+    setBusyId(id);
+    setError('');
+    setNotice('');
+    try {
+      await apiFetch(`/transactions/${id}/dispute`, { method: 'POST', body: { reason } });
+      setNotice('Disputed — this sale is held from settlement until the admin resolves it.');
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const statusBadge = { completed: 'badge-success', disputed: 'badge-warning', refunded: 'badge-muted' };
+
   return (
     <AppShell title={shop ? shop.name : 'Shop Dashboard'} subtitle={shop?.location || 'Sales overview'}>
       {error && <div className="banner banner-error">{error}</div>}
+      {notice && <div className="banner banner-success">{notice}</div>}
 
       {summary && (
         <div className="stat-grid">
@@ -72,6 +94,7 @@ export default function ShopDashboardPage() {
                 <th>Service No.</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -82,9 +105,14 @@ export default function ShopDashboardPage() {
                   <td>{t.staff?.serviceNumber || '—'}</td>
                   <td>₹{t.amount.toFixed(2)}</td>
                   <td>
-                    <span className={`badge ${t.status === 'completed' ? 'badge-success' : 'badge-warning'}`}>
-                      {t.status}
-                    </span>
+                    <span className={`badge ${statusBadge[t.status] || 'badge-muted'}`}>{t.status}</span>
+                  </td>
+                  <td>
+                    {t.type === 'purchase' && t.status === 'completed' && (
+                      <button className="btn btn-secondary" disabled={busyId === t._id} onClick={() => handleDispute(t._id)}>
+                        Dispute
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

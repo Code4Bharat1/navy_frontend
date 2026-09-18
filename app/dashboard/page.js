@@ -36,7 +36,8 @@ export default function DashboardPage() {
       return;
     }
     loadData();
-  }, [router, loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function startRecharge() {
     setError('');

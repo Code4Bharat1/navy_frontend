@@ -10,7 +10,8 @@ export default function Home() {
   useEffect(() => {
     const user = getUser();
     router.replace(user ? roleHome(user.role) : '/login');
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return null;
 }
