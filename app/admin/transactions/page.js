@@ -18,8 +18,6 @@ export default function AdminTransactionsPage() {
   const [cardUidFilter, setCardUidFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [busyId, setBusyId] = useState(null);
 
   const loadTransactions = useCallback(async () => {
     try {
@@ -47,58 +45,9 @@ export default function AdminTransactionsPage() {
     loadTransactions();
   }, [router, loadTransactions]);
 
-  async function handleDispute(id) {
-    const reason = window.prompt('Reason for disputing this transaction:');
-    if (!reason) return;
-    setBusyId(id);
-    setError('');
-    setNotice('');
-    try {
-      await apiFetch(`/transactions/${id}/dispute`, { method: 'POST', body: { reason } });
-      setNotice('Transaction disputed and held from settlement.');
-      await loadTransactions();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleRefund(id) {
-    if (!window.confirm('Refund this transaction? The customer wallet will be credited back and the shop receivable reversed.')) return;
-    setBusyId(id);
-    setError('');
-    setNotice('');
-    try {
-      await apiFetch(`/transactions/${id}/refund`, { method: 'POST' });
-      setNotice('Transaction refunded.');
-      await loadTransactions();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleClear(id) {
-    setBusyId(id);
-    setError('');
-    setNotice('');
-    try {
-      await apiFetch(`/transactions/${id}/clear`, { method: 'POST' });
-      setNotice('Dispute cleared — transaction re-enters the settlement pool.');
-      await loadTransactions();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   return (
-    <AppShell title="Transactions" subtitle="Search purchases across every shop, and resolve disputes">
+    <AppShell title="Transactions" subtitle="Search purchases across every shop">
       {error && <div className="banner banner-error">{error}</div>}
-      {notice && <div className="banner banner-success">{notice}</div>}
 
       <div className="card">
         <div className="flex-row">
@@ -136,7 +85,6 @@ export default function AdminTransactionsPage() {
                 <th>Type</th>
                 <th>Amount</th>
                 <th>Status</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -155,25 +103,6 @@ export default function AdminTransactionsPage() {
                     >
                       {t.status}
                     </span>
-                  </td>
-                  <td>
-                    <div className="flex-row">
-                      {t.type === 'purchase' && t.status === 'completed' && (
-                        <button className="btn btn-secondary" disabled={busyId === t._id} onClick={() => handleDispute(t._id)}>
-                          Dispute
-                        </button>
-                      )}
-                      {t.type === 'purchase' && (t.status === 'completed' || t.status === 'disputed') && (
-                        <button className="btn btn-secondary" disabled={busyId === t._id} onClick={() => handleRefund(t._id)}>
-                          Refund
-                        </button>
-                      )}
-                      {t.status === 'disputed' && (
-                        <button className="btn" disabled={busyId === t._id} onClick={() => handleClear(t._id)}>
-                          Clear dispute
-                        </button>
-                      )}
-                    </div>
                   </td>
                 </tr>
               ))}
