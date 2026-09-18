@@ -80,6 +80,10 @@ export default function ShopDashboardPage() {
             <div className="stat-label">Pending settlement</div>
             <div className="stat-value stat-gold">₹{summary.receivableBalance.toFixed(2)}</div>
           </div>
+          <div className="stat-card">
+            <div className="stat-label">Total earned (all time)</div>
+            <div className="stat-value" style={{ color: 'var(--success)' }}>₹{summary.totalEarned.toFixed(2)}</div>
+          </div>
         </div>
       )}
 

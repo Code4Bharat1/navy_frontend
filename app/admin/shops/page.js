@@ -17,6 +17,7 @@ export default function AdminShopsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [settlingShopId, setSettlingShopId] = useState(null);
 
   const loadShops = useCallback(async () => {
     try {
@@ -80,6 +81,26 @@ export default function AdminShopsPage() {
     }));
   }
 
+  async function handleSettleShop(shop) {
+    if (!window.confirm(`Mark ${shop.name}'s account as settled? Only use this once you've actually paid them.`)) return;
+    setSettlingShopId(shop._id);
+    setError('');
+    setNotice('');
+    try {
+      const data = await apiFetch(`/settlements/run/${shop._id}`, { method: 'POST' });
+      if (data.result.skipped) {
+        setNotice(`${shop.name}: ${data.result.reason}.`);
+      } else {
+        setNotice(`${shop.name} settled — ₹${data.result.netPaid.toFixed(2)} recorded as paid.`);
+      }
+      await loadShops();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSettlingShopId(null);
+    }
+  }
+
   return (
     <AppShell title="Shops" subtitle="Register camp shops and issue their operator logins">
       {error && <div className="banner banner-error">{error}</div>}
@@ -116,14 +137,22 @@ export default function AdminShopsPage() {
       <div className="card-title" style={{ marginLeft: 4 }}>All shops</div>
       {shops.map((shop) => (
         <div className="card" key={shop._id}>
-          <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+          <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{shop.name}</div>
               <div className="muted" style={{ fontSize: 13 }}>{shop.location || 'No location set'}</div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="muted" style={{ fontSize: 12 }}>Receivable balance</div>
-              <div style={{ fontWeight: 700, color: 'var(--navy)' }}>₹{shop.receivableBalance.toFixed(2)}</div>
+            <div className="flex-row" style={{ gap: 24 }}>
+              <div style={{ textAlign: 'right' }}>
+                <div className="muted" style={{ fontSize: 12 }}>Receivable (pending)</div>
+                <div style={{ fontWeight: 700, color: shop.receivableBalance > 0 ? 'var(--gold)' : 'var(--navy)' }}>
+                  ₹{shop.receivableBalance.toFixed(2)}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="muted" style={{ fontSize: 12 }}>Total earned</div>
+                <div style={{ fontWeight: 700, color: 'var(--success)' }}>₹{shop.totalEarned.toFixed(2)}</div>
+              </div>
             </div>
           </div>
 
@@ -136,6 +165,13 @@ export default function AdminShopsPage() {
               onClick={() => setOpenOperatorFor(openOperatorFor === shop._id ? null : shop._id)}
             >
               {openOperatorFor === shop._id ? 'Cancel' : '+ Add operator login'}
+            </button>
+            <button
+              className="btn"
+              disabled={settlingShopId === shop._id || shop.receivableBalance <= 0}
+              onClick={() => handleSettleShop(shop)}
+            >
+              {settlingShopId === shop._id ? 'Settling…' : 'Account Settled'}
             </button>
           </div>
 
