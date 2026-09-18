@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, setToken, setUser, roleHome } from '../../lib/api';
+import { apiFetch, checkHealth, setToken, setUser, roleHome } from '../../lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +10,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [health, setHealth] = useState(null);
+
+  useEffect(() => {
+    checkHealth().then(setHealth);
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -41,6 +46,12 @@ export default function LoginPage() {
             <p className="muted" style={{ fontSize: 13, margin: 0 }}>Sign in to your account</p>
           </div>
         </div>
+
+        {health && health.status !== 'ok' && (
+          <div className="banner banner-error">
+            Cannot reach the server ({health.apiBaseUrl}). Please try again shortly or contact support.
+          </div>
+        )}
 
         {error && <div className="banner banner-error">{error}</div>}
 
