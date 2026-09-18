@@ -8,25 +8,12 @@ import AppShell from '../../../components/AppShell';
 export default function AdminOverviewPage() {
   const router = useRouter();
   const [overview, setOverview] = useState(null);
-  const [config, setConfig] = useState(null);
-  const [commissionInput, setCommissionInput] = useState('');
-  const [disputeWindowInput, setDisputeWindowInput] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [savingConfig, setSavingConfig] = useState(false);
-  const [runningSettlement, setRunningSettlement] = useState(false);
-  const [settlementResults, setSettlementResults] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [overviewData, configData] = await Promise.all([
-        apiFetch('/platform/overview'),
-        apiFetch('/platform/config'),
-      ]);
+      const overviewData = await apiFetch('/platform/overview');
       setOverview(overviewData);
-      setConfig(configData.config);
-      setCommissionInput(String(configData.config.commissionPercent));
-      setDisputeWindowInput(String(configData.config.disputeWindowHours));
     } catch (err) {
       setError(err.message);
     }
@@ -45,49 +32,11 @@ export default function AdminOverviewPage() {
     loadData();
   }, [router, loadData]);
 
-  async function saveConfig(e) {
-    e.preventDefault();
-    setError('');
-    setNotice('');
-    setSavingConfig(true);
-    try {
-      const data = await apiFetch('/platform/config', {
-        method: 'PUT',
-        body: { commissionPercent: Number(commissionInput), disputeWindowHours: Number(disputeWindowInput) },
-      });
-      setConfig(data.config);
-      setNotice('Platform settings updated.');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSavingConfig(false);
-    }
-  }
-
-  async function runSettlement() {
-    setError('');
-    setNotice('');
-    setRunningSettlement(true);
-    setSettlementResults(null);
-    try {
-      const data = await apiFetch('/settlements/run', { method: 'POST' });
-      setSettlementResults(data.results);
-      const paid = data.results.filter((r) => r.status === 'paid').length;
-      setNotice(`Settlement recorded — ${paid} shop${paid === 1 ? '' : 's'} settled.`);
-      await loadData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setRunningSettlement(false);
-    }
-  }
-
   const ledger = overview?.ledger;
 
   return (
-    <AppShell title="Platform Overview" subtitle="Pooled float, ledger integrity, and settlement controls">
+    <AppShell title="Platform Overview" subtitle="Today's activity and points ledger integrity">
       {error && <div className="banner banner-error">{error}</div>}
-      {notice && <div className="banner banner-success">{notice}</div>}
 
       {overview && (
         <>
@@ -148,71 +97,10 @@ export default function AdminOverviewPage() {
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-title">Settlement engine</div>
-            <p className="muted" style={{ fontSize: 13, marginTop: -8, marginBottom: 16 }}>
-              There&apos;s no payment gateway or automated payout here — this records that you&apos;ve
-              paid each shop offline (cash, bank transfer, however) and clears their receivable balance.
-              Transactions inside the dispute window are held back automatically.
-            </p>
-            <button className="btn" onClick={runSettlement} disabled={runningSettlement}>
-              {runningSettlement ? 'Recording…' : 'Record settlement now'}
-            </button>
-
-            {settlementResults && (
-              <div className="table-wrap" style={{ marginTop: 16 }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Shop</th>
-                      <th>Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {settlementResults.map((r, i) => (
-                      <tr key={i}>
-                        <td>{r.shopName}</td>
-                        <td>
-                          {r.skipped ? (
-                            <span className="badge badge-muted">{r.reason}</span>
-                          ) : (
-                            <span className="badge badge-success">Settled ₹{r.netPaid.toFixed(2)}</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <div className="card content-narrow" style={{ padding: 22 }}>
-            <div className="card-title">Platform settings</div>
-            <form onSubmit={saveConfig}>
-              <label>Commission (%) taken from each settlement</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={commissionInput}
-                onChange={(e) => setCommissionInput(e.target.value)}
-              />
-
-              <label>Dispute window (hours)</label>
-              <input
-                type="number"
-                min="0"
-                value={disputeWindowInput}
-                onChange={(e) => setDisputeWindowInput(e.target.value)}
-              />
-
-              <button className="btn" type="submit" disabled={savingConfig}>
-                {savingConfig ? 'Saving…' : 'Save settings'}
-              </button>
-            </form>
-          </div>
+          <p className="muted" style={{ fontSize: 13 }}>
+            To settle a shop&apos;s account, go to <strong>Shops</strong> and click &ldquo;Account Settled&rdquo;
+            on that shop.
+          </p>
         </>
       )}
     </AppShell>
