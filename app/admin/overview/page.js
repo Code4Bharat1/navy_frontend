@@ -73,7 +73,7 @@ export default function AdminOverviewPage() {
       const data = await apiFetch('/settlements/run', { method: 'POST' });
       setSettlementResults(data.results);
       const paid = data.results.filter((r) => r.status === 'paid').length;
-      setNotice(`Settlement run complete — ${paid} shop${paid === 1 ? '' : 's'} paid out.`);
+      setNotice(`Settlement recorded — ${paid} shop${paid === 1 ? '' : 's'} settled.`);
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -113,7 +113,7 @@ export default function AdminOverviewPage() {
           </div>
 
           <div className="card">
-            <div className="card-title">Pooled account ledger integrity</div>
+            <div className="card-title">Points ledger integrity</div>
             <div className="stat-grid" style={{ marginBottom: 0 }}>
               <div className="stat-card">
                 <div className="stat-label">Total recharged (money in)</div>
@@ -151,11 +151,12 @@ export default function AdminOverviewPage() {
           <div className="card">
             <div className="card-title">Settlement engine</div>
             <p className="muted" style={{ fontSize: 13, marginTop: -8, marginBottom: 16 }}>
-              Runs automatically on the server&apos;s configured schedule. Trigger a cycle manually here too —
-              transactions inside the dispute window are held back automatically.
+              There&apos;s no payment gateway or automated payout here — this records that you&apos;ve
+              paid each shop offline (cash, bank transfer, however) and clears their receivable balance.
+              Transactions inside the dispute window are held back automatically.
             </p>
             <button className="btn" onClick={runSettlement} disabled={runningSettlement}>
-              {runningSettlement ? 'Running…' : 'Run settlement now'}
+              {runningSettlement ? 'Recording…' : 'Record settlement now'}
             </button>
 
             {settlementResults && (
@@ -171,18 +172,11 @@ export default function AdminOverviewPage() {
                     {settlementResults.map((r, i) => (
                       <tr key={i}>
                         <td>{r.shopName}</td>
-                        <td style={{ maxWidth: 380 }}>
+                        <td>
                           {r.skipped ? (
                             <span className="badge badge-muted">{r.reason}</span>
                           ) : (
-                            <>
-                              <span className={`badge ${r.status === 'paid' ? 'badge-success' : 'badge-danger'}`}>
-                                {r.status === 'paid' ? `Paid ₹${r.netPaid.toFixed(2)}` : 'Failed'}
-                              </span>
-                              {r.status !== 'paid' && (
-                                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{r.failureReason}</div>
-                              )}
-                            </>
+                            <span className="badge badge-success">Settled ₹{r.netPaid.toFixed(2)}</span>
                           )}
                         </td>
                       </tr>

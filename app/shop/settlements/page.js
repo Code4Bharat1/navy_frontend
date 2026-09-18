@@ -32,16 +32,16 @@ export default function ShopSettlementsPage() {
     loadSettlements();
   }, [router, loadSettlements]);
 
-  const totalPaid = settlements.filter((s) => s.status === 'paid').reduce((sum, s) => sum + s.netPaid, 0);
+  const totalSettled = settlements.reduce((sum, s) => sum + s.netPaid, 0);
 
   return (
-    <AppShell title="Settlements" subtitle="Reconciliation history — what's been paid to your bank account">
+    <AppShell title="Settlements" subtitle="Reconciliation history — what's been settled with you offline">
       {error && <div className="banner banner-error">{error}</div>}
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-label">Total paid out</div>
-          <div className="stat-value">₹{totalPaid.toFixed(2)}</div>
+          <div className="stat-label">Total settled</div>
+          <div className="stat-value">₹{totalSettled.toFixed(2)}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Settlement cycles</div>
@@ -59,7 +59,7 @@ export default function ShopSettlementsPage() {
                 <th>Transactions</th>
                 <th>Gross</th>
                 <th>Commission</th>
-                <th>Net paid</th>
+                <th>Net settled</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -73,19 +73,14 @@ export default function ShopSettlementsPage() {
                   <td>₹{s.grossAmount.toFixed(2)}</td>
                   <td>₹{s.commission.toFixed(2)}</td>
                   <td style={{ fontWeight: 700 }}>₹{s.netPaid.toFixed(2)}</td>
-                  <td style={{ maxWidth: 260 }}>
-                    <span className={`badge ${s.status === 'paid' ? 'badge-success' : s.status === 'failed' ? 'badge-danger' : 'badge-muted'}`}>
-                      {s.status}
-                    </span>
-                    {s.status === 'failed' && s.failureReason && (
-                      <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{s.failureReason}</div>
-                    )}
+                  <td>
+                    <span className="badge badge-success">settled</span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {settlements.length === 0 && <div className="empty-state">No settlements yet — they run automatically, or the admin can trigger one manually.</div>}
+          {settlements.length === 0 && <div className="empty-state">No settlements recorded yet — the admin records one from the Overview page.</div>}
         </div>
       </div>
     </AppShell>

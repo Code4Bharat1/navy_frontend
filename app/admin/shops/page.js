@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { apiFetch, getUser } from '../../../lib/api';
 import AppShell from '../../../components/AppShell';
 
-const emptyShopForm = { name: '', location: '', accountHolderName: '', accountNumber: '', ifsc: '' };
+const emptyShopForm = { name: '', location: '' };
 const emptyOperatorForm = { name: '', email: '', password: '' };
 
 export default function AdminShopsPage() {
@@ -106,18 +106,6 @@ export default function AdminShopsPage() {
 
           <label>Location</label>
           <input value={shopForm.location} onChange={(e) => setShopForm({ ...shopForm, location: e.target.value })} placeholder="e.g. Block C, Shop 4" />
-
-          <label>Bank account holder name</label>
-          <input
-            value={shopForm.accountHolderName}
-            onChange={(e) => setShopForm({ ...shopForm, accountHolderName: e.target.value })}
-          />
-
-          <label>Bank account number</label>
-          <input value={shopForm.accountNumber} onChange={(e) => setShopForm({ ...shopForm, accountNumber: e.target.value })} />
-
-          <label>IFSC</label>
-          <input value={shopForm.ifsc} onChange={(e) => setShopForm({ ...shopForm, ifsc: e.target.value })} />
 
           <button className="btn" type="submit" disabled={busy}>
             {busy ? 'Creating…' : 'Register shop'}
