@@ -14,6 +14,8 @@ export default function ShopPosPage() {
   const [stage, setStage] = useState(STAGE.AMOUNT);
   const [amount, setAmount] = useState('');
   const [scanValue, setScanValue] = useState('');
+  const [manualEntry, setManualEntry] = useState(false);
+  const [manualUid, setManualUid] = useState('');
   const [result, setResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [recent, setRecent] = useState([]);
@@ -33,10 +35,10 @@ export default function ShopPosPage() {
   }, [router]);
 
   useEffect(() => {
-    if (stage === STAGE.SCANNING && scanInputRef.current) {
+    if (stage === STAGE.SCANNING && !manualEntry && scanInputRef.current) {
       scanInputRef.current.focus();
     }
-  }, [stage]);
+  }, [stage, manualEntry]);
 
   const loadRecent = useCallback(async () => {
     try {
@@ -81,12 +83,15 @@ export default function ShopPosPage() {
     e.preventDefault();
     const numericAmount = Number(amount);
     if (!numericAmount || numericAmount <= 0) return;
+    setManualEntry(false);
     setStage(STAGE.SCANNING);
   }
 
   function resetSoon() {
     setTimeout(() => {
       setAmount('');
+      setManualEntry(false);
+      setManualUid('');
       setStage(STAGE.AMOUNT);
     }, 2200);
   }
@@ -125,6 +130,16 @@ export default function ShopPosPage() {
   function cancelScanning() {
     setStage(STAGE.AMOUNT);
     setScanValue('');
+    setManualEntry(false);
+    setManualUid('');
+  }
+
+  function submitManualUid(e) {
+    e.preventDefault();
+    const uid = manualUid.trim();
+    if (!uid) return;
+    setManualUid('');
+    submitScan(uid);
   }
 
   function handleDismissError(key) {
@@ -190,11 +205,31 @@ export default function ShopPosPage() {
             </span>
           </div>
 
-          {stage === STAGE.SCANNING && (
+          {stage === STAGE.SCANNING && !manualEntry && (
             <>
               <div className="scan-title">Tap card on the reader</div>
               <div className="scan-amount">₹{Number(amount).toFixed(2)}</div>
               <div className="scan-hint">Waiting for RFID scan…</div>
+            </>
+          )}
+
+          {stage === STAGE.SCANNING && manualEntry && (
+            <>
+              <div className="scan-title">Enter card UID</div>
+              <div className="scan-amount">₹{Number(amount).toFixed(2)}</div>
+              <form onSubmit={submitManualUid} style={{ width: '100%', maxWidth: 260, marginTop: 12 }}>
+                <input
+                  autoFocus
+                  value={manualUid}
+                  onChange={(e) => setManualUid(e.target.value)}
+                  placeholder="e.g. 04A3B2C1"
+                  style={{ textAlign: 'center', marginBottom: 12 }}
+                  autoComplete="off"
+                />
+                <button className="btn btn-block" type="submit" disabled={!manualUid.trim()}>
+                  Charge ₹{Number(amount).toFixed(2)}
+                </button>
+              </form>
             </>
           )}
 
@@ -221,24 +256,37 @@ export default function ShopPosPage() {
             </>
           )}
 
-          <input
-            ref={scanInputRef}
-            className="scan-hidden-input"
-            value={scanValue}
-            onChange={(e) => setScanValue(e.target.value)}
-            onKeyDown={handleScanKeyDown}
-            onBlur={() => {
-              if (stage === STAGE.SCANNING) {
-                setTimeout(() => scanInputRef.current?.focus(), 10);
-              }
-            }}
-            autoComplete="off"
-          />
+          {!manualEntry && (
+            <input
+              ref={scanInputRef}
+              className="scan-hidden-input"
+              value={scanValue}
+              onChange={(e) => setScanValue(e.target.value)}
+              onKeyDown={handleScanKeyDown}
+              onBlur={() => {
+                if (stage === STAGE.SCANNING && !manualEntry) {
+                  setTimeout(() => scanInputRef.current?.focus(), 10);
+                }
+              }}
+              autoComplete="off"
+            />
+          )}
 
           {stage === STAGE.SCANNING && (
-            <button className="btn btn-ghost" style={{ marginTop: 22, color: '#c4cdec', borderColor: 'rgba(255,255,255,0.25)' }} onClick={cancelScanning}>
-              Cancel
-            </button>
+            <div className="flex-row" style={{ marginTop: 22, justifyContent: 'center' }}>
+              <button className="btn btn-ghost" style={{ color: '#c4cdec', borderColor: 'rgba(255,255,255,0.25)' }} onClick={cancelScanning}>
+                Cancel
+              </button>
+              {!manualEntry ? (
+                <button className="link-btn" onClick={() => setManualEntry(true)}>
+                  Enter UID manually
+                </button>
+              ) : (
+                <button className="link-btn" onClick={() => setManualEntry(false)}>
+                  Back to scanning
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
